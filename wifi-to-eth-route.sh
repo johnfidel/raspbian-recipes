@@ -34,6 +34,8 @@ sudo ifconfig $eth $ip_address netmask $netmask
 
 # Remove default route created by dhcpcd
 sudo ip route del 0/0 dev $eth &> /dev/null
+a=`route | awk "/${wlan}/"'{print $5+1;exit}'`
+sudo route add -net default gw $ip_address netmask 0.0.0.0 dev $eth metric $a
 
 sudo systemctl stop dnsmasq
 
