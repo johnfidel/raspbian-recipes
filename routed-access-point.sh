@@ -20,7 +20,8 @@ psk="raspberry"
 
 sudo kill -9 $(ps aux | grep "$wlan1" | grep -v 'grep' | awk '{print $2}') &> /dev/null
 
-sudo rfkill unblock wlan1 &> /dev/null
+sudo rfkill unblock wifi &> /dev/null
+#sudo rfkill unblock wlan1 &> /dev/null
 sleep 2
 
 sudo systemctl start network-online.target
@@ -40,7 +41,7 @@ sudo ifconfig $wlan1 $ip_address netmask $netmask
 
 sudo rm -rf /etc/dnsmasq.d/* &> /dev/null
 
-echo -e "interface=$wlan1 \n\
+sudo echo -e "interface=$wlan1 \n\
 bind-interfaces \n\
 server=8.8.8.8 \n\
 domain-needed \n\
@@ -63,7 +64,7 @@ ignore_broadcast_ssid=0\n\
 wpa=2\n\
 wpa_key_mgmt=WPA-PSK\n\
 wpa_passphrase=$psk\n\
-rsn_pairwise=CCMP" > /etc/hostapd/hostapd.conf
+rsn_pairwise=CCMP" > /tmp/hostapd.conf
 
 sudo systemctl stop hostapd
-sudo hostapd /etc/hostapd/hostapd.conf &
+sudo hostapd /tmp/hostapd.conf &
