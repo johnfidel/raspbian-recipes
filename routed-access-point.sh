@@ -1,8 +1,16 @@
 # make sure hostapd and dnsmask is installed
 
+sudo systemctl start network-online.target &> /dev/null
+
 sudo systemctl unmask hostapd
 sudo systemctl enable hostapd
-sudo DEBIAN_FRONTEND=noninteractive apt install -y netfilter-persistent iptables-persistent
+
+#sudo DEBIAN_FRONTEND=noninteractive apt install -y netfilter-persistent iptables-persistent
+echo -e "interface wlan0\n"
+    "static ip_address=192.168.4.1/24\n"
+    "nohook wpa_supplicant\" > /tmp/custom-dhcpd.conf
+sudo cp /tmp/custom-dhcpd.conf /etc/dhcpcd.conf
+
 sudo nano /etc/dhcpcd.conf
 
 interface wlan0
