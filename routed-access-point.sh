@@ -1,59 +1,69 @@
-# make sure hostapd and dnsmask is installed
+#!/bin/bash
 
-sudo systemctl start network-online.target &> /dev/null
+# Creates an access point and routes traffic to LAN
+#
+# Make sure you have already installed
+#           dnsmasq
+#           hostapd
+#
+# Please modify the variables according to your need
 
-sudo systemctl unmask hostapd
-sudo systemctl enable hostapd
+ip_address="192.168.2.1"
+netmask="255.255.255.0"
+dhcp_range_start="192.168.2.2"
+dhcp_range_end="192.168.2.100"
+dhcp_time="12h"
+wlan0="eth0"
+wlan1="wlan0" # RPi wifi is wlan0
+ssid="Raspberry-Hotspot"
+psk="raspberry"
 
-#sudo DEBIAN_FRONTEND=noninteractive apt install -y netfilter-persistent iptables-persistent
-echo -e "interface wlan0\n"
-    "static ip_address=192.168.4.1/24\n"
-    "nohook wpa_supplicant\" > /tmp/custom-dhcpd.conf
-sudo cp /tmp/custom-dhcpd.conf /etc/dhcpcd.conf
+sudo kill -9 $(ps aux | grep "$wlan1" | grep -v 'grep' | awk '{print $2}') &> /dev/null
 
-sudo nano /etc/dhcpcd.conf
+sudo rfkill unblock wlan1 &> /dev/null
+sleep 2
 
-interface wlan0
-    static ip_address=192.168.4.1/24
-    nohook wpa_supplicant
-    
-    sudo nano /etc/sysctl.d/routed-ap.conf
-    
-    # https://www.raspberrypi.org/documentation/configuration/wireless/access-point-routed.md
-# Enable IPv4 routing
-net.ipv4.ip_forward=1
+sudo systemctl start network-online.target
 
-sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+sudo iptables -F
+sudo iptables -t nat -F
+sudo iptables -t nat -A POSTROUTING -o $wlan0 -j MASQUERADE
+sudo iptables -A FORWARD -i $wlan0 -o $wlan1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -A FORWARD -i $wlan1 -o $wlan0 -j ACCEPT
 
-sudo netfilter-persistent save
+sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
 
-sudo mv /etc/dnsmasq.conf /etc/dnsmacountry_code=GB
-interface=wlan0
-ssid=NameOfNetwork
-hw_mode=g
-channel=7
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=AardvarkBadgerHedgehog
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
+# Remove default route
+sudo ip route del 0/0 dev $wlan1 &> /dev/null
 
-sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig
-sudo nano /etc/dnsmasq.conf
+sudo ifconfig $wlan1 $ip_address netmask $netmask
 
-interface=wlan0 # Listening interface
-dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
-                # Pool of IP addresses served via DHCP
-domain=wlan     # Local wireless DNS domain
-address=/gw.wlan/192.168.4.1
-                # Alias for this router
-sudo rfkill unblock wlan
-sudo nano /etc/hostapd/hostapd.conf
+sudo rm -rf /etc/dnsmasq.d/* &> /dev/null
 
-sudo systemctl reboot
+echo -e "interface=$wlan1 \n\
+bind-interfaces \n\
+server=8.8.8.8 \n\
+domain-needed \n\
+bogus-priv \n\
+dhcp-range=$dhcp_range_start,$dhcp_range_end,$dhcp_time" > /etc/dnsmasq.d/custom-dnsmasq.conf
 
-                
-                
+sudo systemctl restart dnsmasq
+
+echo -e "interface=$wlan1\n\
+driver=nl80211\n\
+ssid=$ssid\n\
+hw_mode=g\n\
+ieee80211n=1\n\
+wmm_enabled=1\n\
+macaddr_acl=0\n\
+ht_capab=[HT40][SHORT-GI-20][DSSS_CCK-40]\n\
+channel=6\n\
+auth_algs=1\n\
+ignore_broadcast_ssid=0\n\
+wpa=2\n\
+wpa_key_mgmt=WPA-PSK\n\
+wpa_passphrase=$psk\n\
+rsn_pairwise=CCMP" > /etc/hostapd/hostapd.conf
+
+sudo systemctl stop hostapd
+sudo hostapd /etc/hostapd/hostapd.conf &
