@@ -68,3 +68,5 @@ rsn_pairwise=CCMP" > /tmp/hostapd.conf
 
 sudo systemctl stop hostapd
 sudo hostapd /tmp/hostapd.conf &
+
+exit 0
